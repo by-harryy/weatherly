@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Weatherly - Clean & Responsive Weather App</title>
+    <meta
+      name="description"
+      content="A clean, professional, and fully responsive weather forecast application."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌤️</text></svg>"
+      type="image/svg+xml"
+    />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+
+    <!-- Leaflet CSS for Maps -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#3B82F6",
+              "primary-dark": "#2563EB",
+              secondary: "#F59E0B",
+              "light-bg": "#F0F7FF",
+              "card-bg": "#FFFFFF",
+              "text-primary": "#1F2937",
+              "text-secondary": "#6B7280",
+              "text-tertiary": "#9CA3AF",
+              border: "#E5E7EB",
+              success: "#10B981",
+              warning: "#F59E0B",
+              error: "#EF4444",
+            },
+            boxShadow: {
+              soft: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
+              medium:
+                "0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+            },
+            borderRadius: {
+              xl: "16px",
+              large: "12px",
+            },
+          },
+        },
+      };
+    </script>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        background: linear-gradient(135deg, #f0f7ff 0%, #e6f0ff 100%);
+        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      .gradient-border::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: linear-gradient(90deg, #3b82f6, #f59e0b);
+        border-radius: 16px 16px 0 0;
+      }
+
+      /* Custom scrollbar for hourly forecast */
+      .hourly-scroll::-webkit-scrollbar {
+        height: 6px;
+      }
+
+      .hourly-scroll::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 3px;
+      }
+
+      .hourly-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+      }
+
+      .hourly-scroll::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+
+      /* Animation for weather cards */
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .animate-fadeIn {
+        animation: fadeIn 0.5s ease-out forwards;
+      }
+    </style>
+  </head>
+
+  <body class="text-text-primary">
+    <!-- Header -->
+    <header
+      class="overflow-hidden sticky top-0 bg-white/90 backdrop-blur-md border-b border-border z-50"
+    >
+      <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div class="flex items-center justify-between">
+          <a
+            href="#"
+            class="flex items-center gap-3 text-2xl font-bold text-primary"
+          >
+            <i class="fa-solid fa-cloud-sun text-secondary text-3xl"></i>
+            <span>Weatherly</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-hidden">
+      <!-- Loading State -->
+      <div id="loading" class="text-center py-20 hidden">
+        <i class="fas fa-spinner fa-spin text-primary text-5xl mb-4"></i>
+        <p class="text-text-secondary font-medium">Loading Weather Data...</p>
+      </div>
+
+      <!-- Error Message -->
+      <div
+        id="error-message"
+        class="bg-red-100 border border-red-300 text-red-800 p-4 rounded-xl mb-8 hidden animate-fadeIn max-w-2xl mx-auto"
+      ></div>
+
+      <!-- Search Form -->
+      <div class="max-w-2xl mx-auto mb-10">
+        <div class="relative">
+          <input
+            id="location-input"
+            type="text"
+            placeholder="Search for a city..."
+            autocomplete="off"
+            class="w-full rounded-full border border-border bg-white shadow-soft py-4 pl-6 pr-14 text-text-primary placeholder:text-text-tertiary focus:border-primary focus:ring-2 focus:ring-primary/30 outline-none transition"
+          />
+          <button
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-primary text-xl"
+          >
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </button>
+        </div>
+        <div
+          id="search-suggestions"
+          class="mt-2 bg-white rounded-xl border border-border shadow-medium max-h-60 overflow-y-auto hidden"
+        ></div>
+      </div>
+
+      <!-- Recent & Favorites Section -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <!-- Recent Searches -->
+        <div
+          class="bg-card-bg border border-border rounded-xl shadow-medium p-6"
+        >
+          <h3
+            class="font-semibold text-text-primary mb-4 flex items-center gap-2"
+          >
+            <i class="fa-solid fa-clock-rotate-left text-text-tertiary"></i>
+            Recent Searches
+          </h3>
+          <div id="recent-searches" class="flex flex-wrap gap-2">
+            <p class="text-text-tertiary text-sm">No recent searches yet.</p>
+          </div>
+        </div>
+
+        <!-- Favorites -->
+        <div
+          class="bg-card-bg border border-border rounded-xl shadow-medium p-6"
+        >
+          <h3
+            class="font-semibold text-text-primary mb-4 flex items-center gap-2"
+          >
+            <i class="fa-solid fa-heart text-error"></i>
+            Favorite Locations
+          </h3>
+          <div id="favorites-section" class="flex flex-wrap gap-2">
+            <p class="text-text-tertiary text-sm">
+              No favorites yet. Click the heart icon to add locations.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Weather Content -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Current Weather Card -->
+        <div
+          class="lg:col-span-2 bg-card-bg rounded-xl shadow-medium overflow-hidden relative gradient-border"
+        >
+          <div class="p-6">
+            <div class="flex justify-between items-start mb-6">
+              <div>
+                <h2
+                  id="location-name"
+                  class="text-3xl font-bold text-text-primary"
+                >
+                  Bandung
+                </h2>
+                <time id="current-date" class="text-text-secondary"
+                  >Thursday, 28 June</time
+                >
+              </div>
+              <button
+                id="favorite-btn"
+                class="text-text-tertiary hover:text-error text-2xl transition-colors"
+              >
+                <i class="far fa-heart"></i>
+              </button>
+            </div>
+
+            <div class="flex items-center justify-between mb-8">
+              <div id="current-weather-icon" class="text-5xl text-primary">
+                <i class="fas fa-sun"></i>
+              </div>
+              <div class="text-right">
+                <p
+                  id="current-temp"
+                  class="text-3xl font-bold text-text-primary"
+                >
+                  27°
+                </p>
+                <p
+                  id="weather-description"
+                  class="text-xl text-text-secondary capitalize"
+                >
+                  Sunny
+                </p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div class="bg-light-bg rounded-large p-4 text-center">
+                <i
+                  class="fa-solid fa-temperature-high text-primary text-xl mb-2"
+                ></i>
+                <p class="text-sm text-text-secondary">Feels Like</p>
+                <p id="feels-like" class="font-semibold text-lg">28°</p>
+              </div>
+              <div class="bg-light-bg rounded-large p-4 text-center">
+                <i class="fa-solid fa-wind text-primary text-xl mb-2"></i>
+                <p class="text-sm text-text-secondary">Wind</p>
+                <p id="wind-speed" class="font-semibold text-lg">8 km/h</p>
+              </div>
+              <div class="bg-light-bg rounded-large p-4 text-center">
+                <i class="fa-solid fa-droplet text-primary text-xl mb-2"></i>
+                <p class="text-sm text-text-secondary">Humidity</p>
+                <p id="humidity" class="font-semibold text-lg">12%</p>
+              </div>
+              <div class="bg-light-bg rounded-large p-4 text-center">
+                <i class="fa-solid fa-sun text-primary text-xl mb-2"></i>
+                <p class="text-sm text-text-secondary">UV Index</p>
+                <p id="uv-index" class="font-semibold text-lg">9</p>
+              </div>
+              <div class="bg-light-bg rounded-large p-4 text-center">
+                <i class="fa-solid fa-gauge text-primary text-xl mb-2"></i>
+                <p class="text-sm text-text-secondary">Pressure</p>
+                <p id="pressure" class="font-semibold text-lg">979hPa</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column - Hourly Forecast -->
+        <div class="bg-card-bg rounded-xl shadow-medium p-6">
+          <h3
+            class="font-semibold text-text-primary mb-4 flex items-center gap-2"
+          >
+            <i class="fa-solid fa-clock text-primary"></i>
+            Hourly Forecast
+          </h3>
+          <div class="hourly-scroll overflow-x-auto pb-2">
+            <div id="hourly-forecast" class="flex gap-4 min-w-max">
+              <!-- Hourly items will be added here -->
+              <div
+                class="bg-light-bg rounded-large p-4 min-w-[100px] text-center"
+              >
+                <p class="font-medium">Now</p>
+                <i class="fa-solid fa-sun text-primary text-2xl my-3"></i>
+                <p class="font-bold text-xl">27°</p>
+              </div>
+              <div
+                class="bg-light-bg rounded-large p-4 min-w-[100px] text-center"
+              >
+                <p class="font-medium">1 PM</p>
+                <i class="fa-solid fa-cloud-sun text-primary text-2xl my-3"></i>
+                <p class="font-bold text-xl">28°</p>
+              </div>
+              <div
+                class="bg-light-bg rounded-large p-4 min-w-[100px] text-center"
+              >
+                <p class="font-medium">2 PM</p>
+                <i class="fa-solid fa-cloud text-primary text-2xl my-3"></i>
+                <p class="font-bold text-xl">27°</p>
+              </div>
+              <div
+                class="bg-light-bg rounded-large p-4 min-w-[100px] text-center"
+              >
+                <p class="font-medium">3 PM</p>
+                <i
+                  class="fa-solid fa-cloud-rain text-primary text-2xl my-3"
+                ></i>
+                <p class="font-bold text-xl">26°</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Daily Forecast -->
+          <h3
+            class="font-semibold text-text-primary mt-8 mb-4 flex items-center gap-2"
+          >
+            <i class="fa-solid fa-calendar-days text-primary"></i>
+            7-Day Forecast
+          </h3>
+          <div id="forecast-container" class="space-y-3">
+            <!-- Daily forecast items will be added here -->
+            <div
+              class="flex items-center justify-between p-3 bg-light-bg rounded-large"
+            >
+              <span class="font-medium">Today</span>
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-sun text-primary"></i>
+                <span class="font-semibold">27° / 18°</span>
+              </div>
+            </div>
+            <div
+              class="flex items-center justify-between p-3 bg-light-bg rounded-large"
+            >
+              <span class="font-medium">Fri</span>
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-cloud-sun text-primary"></i>
+                <span class="font-semibold">26° / 17°</span>
+              </div>
+            </div>
+            <div
+              class="flex items-center justify-between p-3 bg-light-bg rounded-large"
+            >
+              <span class="font-medium">Sat</span>
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-cloud-rain text-primary"></i>
+                <span class="font-semibold">24° / 16°</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map Section -->
+      <div class="bg-card-bg rounded-xl shadow-medium p-6 mb-8">
+        <h3
+          class="font-semibold text-text-primary mb-4 flex items-center gap-2"
+        >
+          <i class="fa-solid fa-map-location-dot text-primary"></i>
+          Location Map
+        </h3>
+        <div
+          id="map"
+          class="h-80 bg-light-bg rounded-xl flex items-center justify-center"
+        >
+          <p class="text-text-tertiary">Map will be loaded here</p>
+        </div>
+      </div>
+    </main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+
+    <script src="./src/main.js"></script>
+  </body>
+</html>
